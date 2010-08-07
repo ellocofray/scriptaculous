@@ -170,6 +170,7 @@ var Draggables = {
     var pointer = [Event.pointerX(event), Event.pointerY(event)];
     // Mozilla-based browsers fire successive mousemove events with
     // the same coordinates, prevent needless redrawing (moz bug?)
+    // TNT
     if(this._lastPointer && (this._lastPointer.inspect() == pointer.inspect())) return;
     this._lastPointer = pointer;
 
@@ -228,7 +229,7 @@ var Draggable = Class.create({
       reverteffect: function(element, top_offset, left_offset) {
         var dur = Math.sqrt(Math.abs(top_offset^2)+Math.abs(left_offset^2))*0.02;
         new Effect.Move(element, { x: -left_offset, y: -top_offset, duration: dur,
-          queue: {scope:'_draggable', position:'end'}
+          //queue: {scope:'_draggable', position:'end'}
         });
       },
       endeffect: function(element) {
@@ -301,7 +302,8 @@ var Draggable = Class.create({
       Draggable._dragging[this.element]) return;
     if(Event.isLeftClick(event)) {
       // abort on form elements, fixes a Firefox issue
-      var src = Event.element(event);
+      //var src = Event.element(event);
+      var src = event.findElement();
       if((tag_name = src.tagName.toUpperCase()) && (
         tag_name=='INPUT' ||
         tag_name=='SELECT' ||
@@ -309,8 +311,18 @@ var Draggable = Class.create({
         tag_name=='BUTTON' ||
         tag_name=='TEXTAREA')) return;
 
-      var pointer = [Event.pointerX(event), Event.pointerY(event)];
-      var pos     = this.element.cumulativeOffset();
+      var pointer = [ event.pointerX(), event.pointerY() ];
+      var pos = [];
+      
+      if (this.options.ghosting) {
+        var screen_pos = this.element.viewportOffset();
+        var scroll = document.viewport.getScrollOffsets();
+        pos = [0,1].map( function(i) { return (screen_pos[i] + scroll[i]) });
+      }
+      else {
+        pos = this.element.cumulativeOffset();
+      }
+      
       this.offset = [0,1].map( function(i) { return (pointer[i] - pos[i]) });
 
       Draggables.activate(this);
@@ -328,7 +340,7 @@ var Draggable = Class.create({
       this.element.style.zIndex = this.options.zindex;
     }
 
-    if( this.options.ghosting || this.options.superghosting ) {
+    if( this.options.ghosting ) {
       body = document.getElementsByTagName("body")[0];
       this._clone = this.element.clone(true);
 
@@ -344,23 +356,24 @@ var Draggable = Class.create({
       this._originallyAbsolute = (this.element.getStyle('position') == 'absolute');
       if (!this._originallyAbsolute)
         this.element.absolutize();
-      this.element.insert({before: this._clone});
-      
-      //this.element.id = "clone_" + this.element.id;
-      this.element.remove();
-      $(body).insert(this.element); //appendChild(this.element);
 
+      this.element.insert({after: this._clone});
+      this.element.remove();
+      $(body).insert(this.element);
+
+      /*
       //Retain height and width of object only if it has been nulled out.  -v0.3 Fix
       if (this.element.style.width == "0px" || this.element.style.height == "0px")	{
         this.element.style.width = Element.getWidth(this._clone)+"px";
         this.element.style.height = Element.getHeight(this._clone)+"px";
       }
+      */
 
       //overloading in order to reduce repeated code weight.
-      this.originalScrollTop = this._clone.getHeight()/2; //(Element.getHeight(this._clone)/2);
-      this.originalScrollLeft = this._clone.getWidth()/2; //(Element.getHeight(this._clone)/2);
+      //this.originalScrollTop = this._clone.getHeight()/2; //(Element.getHeight(this._clone)/2);
+      //this.originalScrollLeft = this._clone.getWidth()/2; //(Element.getHeight(this._clone)/2);
 
-      this.draw( event.pointer() );
+      //this.draw( [event.pointerX(), event.pointerY() ] );
       this.element.show();
       
     }
@@ -424,14 +437,14 @@ var Draggable = Class.create({
   finishDrag: function(event, success) {
     this.dragging = false;
 
-    if(this.options.quiet){
+    if(this.options.quiet) {
       Position.prepare();
       var pointer = [Event.pointerX(event), Event.pointerY(event)];
       Droppables.show(pointer, this.element);
     }
 
-// AQUI SE REVIENTA EL CLON Y SE LE VUELVE A DAR POSOCION AL ELEMENTO SI TIENE REVERT VUELVE AL LUGAR
-    if(this.options.ghosting || this.options.superghosting)  {
+    if(this.options.ghosting)  {
+      // ponelo al final
       this._clone.parentNode.insertBefore(this.element, this._clone);
       if (!this._originallyAbsolute)
         Position.relativize(this.element);
@@ -485,11 +498,6 @@ var Draggable = Class.create({
 
   draw: function(point) {
     var pos = this.element.cumulativeOffset();
-    if(this.options.ghosting) {
-      var r   = Position.realOffset(this.element);
-      pos[0] += r[0] - Position.deltaX; pos[1] += r[1] - Position.deltaY;
-    }
-
     var d = this.currentDelta();
     pos[0] -= d[0]; pos[1] -= d[1];
 
@@ -499,7 +507,7 @@ var Draggable = Class.create({
     }
 
     var p = [0,1].map(function(i){
-      return (point[i]-pos[i]-this.offset[i])
+      return (point[i] - pos[i] - this.offset[i])
     }.bind(this));
 
     if(this.options.snap) {
@@ -515,11 +523,6 @@ var Draggable = Class.create({
       }
     }}
     
-    if (this.options.superghosting)	{	
-      p[0] = point[0] - this.originalScrollLeft;
-      p[1] = point[1] - this.originalScrollTop;
-    }
-
     var style = this.element.style;
     if((!this.options.constraint) || (this.options.constraint=='horizontal'))
       style.left = p[0] + "px";
