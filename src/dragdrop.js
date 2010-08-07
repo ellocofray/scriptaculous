@@ -328,14 +328,43 @@ var Draggable = Class.create({
       this.element.style.zIndex = this.options.zindex;
     }
 
-    if(this.options.ghosting) {
-      this._clone = this.element.cloneNode(true);
+    if( this.options.ghosting || this.options.superghosting ) {
+      body = document.getElementsByTagName("body")[0];
+      this._clone = this.element.clone(true);
+
+      /*
+      if (Prototype.Browser.IE) {
+        // Clear event handing from the clone
+        // Solves the second drag issue in IE
+        this._clone.clearAttributes();
+        this._clone.mergeAttributes(this.element.cloneNode(false));
+      }
+      */
+
       this._originallyAbsolute = (this.element.getStyle('position') == 'absolute');
       if (!this._originallyAbsolute)
-        Position.absolutize(this.element);
-      this.element.parentNode.insertBefore(this._clone, this.element);
-    }
+        this.element.absolutize();
+      this.element.insert({before: this._clone});
+      
+      //this.element.id = "clone_" + this.element.id;
+      this.element.remove();
+      $(body).insert(this.element); //appendChild(this.element);
 
+      //Retain height and width of object only if it has been nulled out.  -v0.3 Fix
+      if (this.element.style.width == "0px" || this.element.style.height == "0px")	{
+        this.element.style.width = Element.getWidth(this._clone)+"px";
+        this.element.style.height = Element.getHeight(this._clone)+"px";
+      }
+
+      //overloading in order to reduce repeated code weight.
+      this.originalScrollTop = this._clone.getHeight()/2; //(Element.getHeight(this._clone)/2);
+      this.originalScrollLeft = this._clone.getWidth()/2; //(Element.getHeight(this._clone)/2);
+
+      this.draw( event.pointer() );
+      this.element.show();
+      
+    }
+    
     if(this.options.scroll) {
       if (this.options.scroll == window) {
         var where = this._getWindowScroll(this.options.scroll);
@@ -401,7 +430,9 @@ var Draggable = Class.create({
       Droppables.show(pointer, this.element);
     }
 
-    if(this.options.ghosting) {
+// AQUI SE REVIENTA EL CLON Y SE LE VUELVE A DAR POSOCION AL ELEMENTO SI TIENE REVERT VUELVE AL LUGAR
+    if(this.options.ghosting || this.options.superghosting)  {
+      this._clone.parentNode.insertBefore(this.element, this._clone);
       if (!this._originallyAbsolute)
         Position.relativize(this.element);
       delete this._originallyAbsolute;
@@ -483,6 +514,11 @@ var Draggable = Class.create({
           return (v/this.options.snap).round()*this.options.snap }.bind(this));
       }
     }}
+    
+    if (this.options.superghosting)	{	
+      p[0] = point[0] - this.originalScrollLeft;
+      p[1] = point[1] - this.originalScrollTop;
+    }
 
     var style = this.element.style;
     if((!this.options.constraint) || (this.options.constraint=='horizontal'))
