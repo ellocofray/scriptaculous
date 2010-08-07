@@ -229,7 +229,7 @@ var Draggable = Class.create({
       reverteffect: function(element, top_offset, left_offset) {
         var dur = Math.sqrt(Math.abs(top_offset^2)+Math.abs(left_offset^2))*0.02;
         new Effect.Move(element, { x: -left_offset, y: -top_offset, duration: dur,
-          queue: {scope:'_draggable', position:'end'}
+          //queue: {scope:'_draggable', position:'end'}
         });
       },
       endeffect: function(element) {
@@ -344,11 +344,15 @@ var Draggable = Class.create({
       body = document.getElementsByTagName("body")[0];
       this._clone = this.element.clone(true);
 
+      /*
       if (Prototype.Browser.IE) {
+        // Clear event handing from the clone
+        // Solves the second drag issue in IE
         this._clone.clearAttributes();
         this._clone.mergeAttributes(this.element.cloneNode(false));
       }
-      
+      */
+
       this._originallyAbsolute = (this.element.getStyle('position') == 'absolute');
       if (!this._originallyAbsolute)
         this.element.absolutize();
@@ -357,12 +361,21 @@ var Draggable = Class.create({
       this.element.remove();
       $(body).insert(this.element);
 
+      /*
+      //Retain height and width of object only if it has been nulled out.  -v0.3 Fix
       if (this.element.style.width == "0px" || this.element.style.height == "0px")	{
         this.element.style.width = Element.getWidth(this._clone)+"px";
         this.element.style.height = Element.getHeight(this._clone)+"px";
       }
+      */
 
+      //overloading in order to reduce repeated code weight.
+      //this.originalScrollTop = this._clone.getHeight()/2; //(Element.getHeight(this._clone)/2);
+      //this.originalScrollLeft = this._clone.getWidth()/2; //(Element.getHeight(this._clone)/2);
+
+      //this.draw( [event.pointerX(), event.pointerY() ] );
       this.element.show();
+      
     }
     
     if(this.options.scroll) {
